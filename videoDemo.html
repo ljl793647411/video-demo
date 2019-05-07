@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <script src="AgoraRTCSDK-2.4.1.js"></script>
+  <script src="vendor/jquery.js"></script>
+  <title>videoDemo</title>
+</head>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    width: 50%;
+    margin: 0 auto;
+  }
+  .top-box {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .box1,.device{
+    height: 100px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-around;
+  }
+  .device {
+    margin: 0;
+  }
+  .box1 input[type="text"],.device select {
+    width: 200px;
+    height: 35px;
+    font-size: 18px;
+    line-height: 35px;
+    border: 1px solid blue;
+    border-radius: 5px;
+  }
+  .btnBox {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-around; 
+  }
+  .btnBox button {
+    width: 100px;
+    height: 30px;
+    font-size: 20px;
+    color: #000;
+    background: skyblue;
+    border-radius: 5px;
+    border: 1px blue solid;
+  }
+  #video-class {
+    margin: 0 auto;
+    margin-top: 20px; 
+    position: relative;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    height: 600px;
+  }
+  #local-video {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 250px;
+    height: 150px;
+    z-index: 2;
+    /* background: #ccc; */
+  }
+  .remote {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+</style>
+<body>
+  <div class="top-box">
+    <div class="box1">
+      <div>
+        <span>appID：</span>
+        <input type="text" name="appID" id="appID">
+      </div>
+      <div>
+        <span>频道：</span>
+        <input type="text" name="channel" id="channel">
+      </div>
+      <div>
+        <label for="videoSwitch">开启视频：</label>
+        <input type="checkbox" checked id="videoSwitch">
+      </div>
+    </div>
+    <div class="device">
+      <span>选择设备：</span>
+      <div>
+        <label for="aurio">麦克风：</label>
+        <select name="audio" id="audio"></select>
+      </div>
+      <div>
+        <select name="video" id="video">摄像头：</select>
+      </div>
+    </div>
+    <div class="btnBox">
+      <button id="join" onclick="join()">加入频道</button>
+      <button id="leave" onclick="leave()">离开频道</button>
+      <button id="publish" onclick="publish()">发布</button>
+      <button id="unpublish" onclick="unpublish()">取消发布</button>
+    </div>
+  </div>
+  <div id="video-class">
+    <div id="local-video"></div>
+  </div>
+</body>
+
+<script>
+  if(!AgoraRTC.checkSystemRequirements()) {
+    alert("您的浏览器不支持 WebRTC!");
+  }
+
+  var client, localStream, camera, mic;
+  
+  var audioSelect = document.getElementById('audio')
+  var videoSelect = document.getElementById('video')
+
+  function getDevices() { //获取当前设备信息
+    AgoraRTC.getDevices(function (devices) {
+      for (var i = 0; i !== devices.length; ++i) {
+        var device = devices[i];
+        var option = document.createElement('option');
+        option.value = device.deviceId;
+        if (device.kind === 'audioinput') {   // 如果是音频设备
+          option.text = device.label || '麦克风' + (audioSelect.length + 1);
+          audioSelect.appendChild(option);
+        } else if (device.kind === 'videoinput') {  // 如果是视频设备
+          option.text = device.label || '摄像头 ' + (videoSelect.length + 1);
+          videoSelect.appendChild(option);
+        } else {
+          console.log('其他设备: ', device);
+        }
+      }
+    });
+  }
+
+  getDevices();
+  function join () {
+    document.getElementById("join").disabled = true;
+    var channel_key = null;
+    console.log('输入的appID:', appID.value)
+    if (!appID.value) {
+      appID.value = '366d9039d4984a80b27e1651fb131b98'
+    }
+    if (!channel.value) {
+      channel.value = '1000'
+    }
+    client = AgoraRTC.createClient({mode: 'interop', codec: "h264"});
+    client.init(appID.value, function () {
+      client.join(channel_key, channel.value, null, function(uid) {
+        console.log("当前用户UID" + uid + " 加入频道成功");
+        if (document.getElementById("videoSwitch").checked) {
+          camera = video.value;
+          microphone = audio.value;
+          localStream = AgoraRTC.createStream({streamID: uid, audio: true, cameraId: camera, microphoneId: microphone, video: document.getElementById("videoSwitch").checked, screen: false});
+          //localStream = AgoraRTC.createStream({streamID: uid, audio: false, cameraId: camera, microphoneId: microphone, video: false, screen: true, extensionId: 'minllpmhdgpndnkomcoccfekfegnlikg'});
+          if (document.getElementById("videoSwitch").checked) {
+            localStream.setVideoProfile('720p_3');
+          } 
+
+          // 用户已允许使用麦克风和摄像头.
+          localStream.on("accessAllowed", function() {
+            console.log("用户已允许使用麦克风和摄像头");
+          });
+
+          // 用户已禁止使用麦克风和摄像头.
+          localStream.on("accessDenied", function() {
+            console.log("用户已禁止使用麦克风和摄像头");
+          });
+
+          localStream.init(function() {
+            console.log("成功获取媒体，音频流初始化成功，开始发布音频流");
+            localStream.play('local-video');
+            client.publish(localStream, function (err) {
+              console.log("发布本地音频流失败: " + err);
+            });
+
+            client.on('stream-published', function (evt) {
+              console.log("发布本地音频流成功");
+            });
+          }, function (err) {
+            console.log("获取媒体失败，音频流初始化失败：", err);
+          });
+        }
+      }, function(err) {
+        console.log("加入频道失败原因：", err);
+      });
+    },function (err) {
+      console.log('加入频道init失败', err)
+    })
+    channelKey = "";  //如果设置了通道密钥
+    client.on('error', function(err) { //监听错误
+      console.log("Got error msg:", err.reason);
+      if (err.reason === 'DYNAMIC_KEY_TIMEOUT') {
+        client.renewChannelKey(channelKey, function(){
+          console.log("更新通道密钥成功");
+        }, function(err){
+          console.log("更新通道密钥失败: ", err);
+        });
+      }
+    });
+    client.on('stream-added', function (evt) {  //监测到有人进入该频道并发布音频流  
+      var stream = evt.stream;
+      console.log("新增加的音频流，该音频流ID: " + stream.getId());
+      console.log("准备订阅该音频流", stream);
+      client.subscribe(stream, function (err) {
+        console.log("订阅音频流失败", err);
+      });
+    });
+
+    client.on('stream-subscribed', function (evt) {  //订阅音频流
+      var stream = evt.stream;
+      console.log("成功订阅远程音频流，该音频流ID: " + stream.getId());
+      if ($('div#video-class #remote-video'+stream.getId()).length === 0) {
+        $('div#video-class').append('<div id="remote-video'+stream.getId()+'" class="remote"></div>');
+      }
+      stream.play('remote-video' + stream.getId());
+    });
+
+    client.on('stream-removed', function (evt) {  //监听到远端音频流离开事件
+      var stream = evt.stream;
+      stream.stop();  //停止播放远端音频流
+      $('#remote-video' + stream.getId()).remove();
+      console.log("移出远端音频流 " + stream.getId());
+    });
+
+    client.on('peer-leave', function (evt) {  //监听到已离开
+      var stream = evt.stream;
+      if (stream) {
+        stream.stop();
+        $('#remote-video' + stream.getId()).remove();
+        console.log(evt.uid + " 已离开频道");
+      }
+    });
+  }
+  function leave() {
+    document.getElementById("leave").disabled = true;
+    client.leave(function () {
+      console.log("进入频道成功");
+    }, function (err) {
+      console.log("进入通道失败");
+    });
+  }
+
+  function publish() {
+    document.getElementById("publish").disabled = true;
+    document.getElementById("unpublish").disabled = false;
+    client.publish(localStream, function (err) {
+      console.log("发布本地音频流失败: " + err);
+    });
+  }
+
+  function unpublish() {
+    document.getElementById("publish").disabled = false;
+    document.getElementById("unpublish").disabled = true;
+    client.unpublish(localStream, function (err) {
+      console.log("取消发布本地音频流失败" + err);
+    });
+  }
+
+
+
+
+</script>
+
+
+
+</html>
